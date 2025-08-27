@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Webinar Add-to-Calendar Link Generator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --fg:#1b1b1b; --bg:#f7f7fb; --muted:#666; --brand:#1b6cff; --ok:#0a7f2e; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--fg); background:var(--bg); margin:0; }
+  .wrap { max-width: 980px; margin: 24px auto 64px; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 8px 0 16px; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; background: #fff; padding: 16px; margin-bottom: 16px; }
+  legend { padding: 0 8px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type="text"], input[type="datetime-local"], select, textarea {
+    width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font: inherit; background: #fff;
+  }
+  textarea { min-height: 96px; }
+  .row { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; }
+  button, .btn { background: var(--brand); color: #fff; border: 0; border-radius: 6px; padding: 10px 12px; cursor: pointer; font: inherit; }
+  button.secondary { background: #e9ecf8; color: #1a3c8f; }
+  .note { font-size: 12px; color: var(--muted); }
+  .out { background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-top: 8px; }
+  .out h3 { margin: 0 0 8px; font-size: 14px; }
+  .linkrow { display:flex; gap:8px; align-items:center; margin-bottom: 8px; flex-wrap: wrap; }
+  .linkrow input[type="text"] { flex: 1 1 520px; }
+  .success { color: var(--ok); font-size: 12px; margin-left: 8px; }
+  .warn { color: #a66a00; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Webinar Add-to-Calendar Link Generator</h1>
+    <p class="note">Times are interpreted in the selected event timezone. The tool converts to UTC for each provider.</p>
+
+    <div class="note" style="margin-bottom:8px;">
+      Join link pattern used in outputs: https://global.gotowebinar.com/join/{event}/&#123;&#123;member.registration code&#125;&#125;
+    </div>
+
+    <div id="app">
+      <fieldset>
+        <legend>Event details</legend>
+        <div class="grid">
+          <div>
+            <label for="title">Title</label>
+            <input id="title" type="text" placeholder="e.g., Modernizing Your Data Platform" required />
+          </div>
+          <div>
+            <label for="tz">Event timezone</label>
+            <select id="tz"></select>
+          </div>
+          <div>
+            <label for="start">Start (in selected timezone)</label>
+            <input id="start" type="datetime-local" required />
+          </div>
+          <div>
+            <label for="end">End (in selected timezone)</label>
+            <input id="end" type="datetime-local" required />
+          </div>
+          <div>
+            <label for="location">Location (optional)</label>
+            <input id="location" type="text" placeholder="Leave blank to use the Join URL" />
+          </div>
+          <div>
+            <label for="gtwEvent">GoToWebinar Event Number</label>
+            <input id="gtwEvent" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="e.g., 7196604210221276254" />
+            <div class="note">Join link becomes: https://global.gotowebinar.com/join/{event}/&#123;&#123;member.registration code&#125;&#125;</div>
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label for="desc">Description (optional)</label>
+            <textarea id="desc" placeholder="What attendees will learn, speaker names, support contact..."></textarea>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button type="button" id="generate">Generate links</button>
+          <span class="note" id="status"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Output links</legend>
+
+        <div class="out">
+          <h3>Google Calendar</h3>
+          <div class="linkrow">
+            <input id="googleLink" type="text" readonly />
+            <button type="button" class="secondary" data-copy="#googleLink">Copy</button>
+            <a id="googleOpen" class="btn" target="_blank" rel="noopener">Open</a>
+          </div>
+        </div>
+
+        <div class="out">
+          <h3>Outlook on the Web (Microsoft 365)</h3>
+          <div class="linkrow">
+            <input id="o365Link" type="text" readonly />
+            <button type="button" class="secondary" data-copy="#o365Link">Copy</button>
+            <a id="o365Open" class="btn" target="_blank" rel="noopener">Open</a>
+          </div>
+        </div>
+
+        <div class="out">
+          <h3>Outlook.com (consumer)</h3>
+          <div class="linkrow">
+            <input id="outlookComLink" type="text" readonly />
+            <button type="button" class="secondary" data-copy="#outlookComLink">Copy</button>
+            <a id="outlookComOpen" class="btn" target="_blank" rel="noopener">Open</a>
+          </div>
+        </div>
+
+        <div class="out">
+          <h3>Yahoo Calendar</h3>
+          <div class="linkrow">
+            <input id="yahooLink" type="text" readonly />
+            <button type="button" class="secondary" data-copy="#yahooLink">Copy</button>
+            <a id="yahooOpen" class="btn" target="_blank" rel="noopener">Open</a>
+          </div>
+        </div>
+
+        <div class="out">
+          <h3>ICS (for Apple Calendar / Outlook desktop)</h3>
+          <div class="row" style="margin-bottom:8px;">
+            <button type="button" id="downloadIcs">Download .ics</button>
+            <button type="button" class="secondary" data-copy="#icsText">Copy ICS</button>
+            <span class="note">If hosting one ICS for all, avoid per-registrant tokens in URL. Use per-recipient ICS only if your MA platform generates it at send.</span>
+          </div>
+          <textarea id="icsText" class="mono" readonly></textarea>
+          <div class="note" style="margin-top:6px;">
+            After hosting at https://yourdomain.com/cal/your-event.ics, your Apple/Outlook desktop link is:
+            <span class="mono">webcal://yourdomain.com/cal/your-event.ics</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <p class="note">
+        We keep &#123;&#123;member.registration code&#125;&#125; literal in links so your MA platform replaces it at send time.
+      </p>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  // Build the token at runtime so it never appears in the HTML source
+  const tokenPlaceholder = ['{{','member.registration code','}}'].join('');
+
+  // Timezone dropdown
+  const tzSelect = $('#tz');
+  const defaultTz = (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  let tzList = [];
+  try { tzList = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []); } catch(e) { tzList = []; }
+  if (tzList.length === 0) {
+    tzList = [
+      'UTC','America/New_York','America/Chicago','America/Denver','America/Los_Angeles',
+      'Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Amsterdam',
+      'Europe/Stockholm','Europe/Rome','Asia/Dubai','Asia/Kolkata','Asia/Singapore',
+      'Asia/Tokyo','Australia/Sydney'
+    ];
+  }
+  tzList.forEach(z => { const o=document.createElement('option'); o.value=z; o.textContent=z; tzSelect.appendChild(o); });
+  tzSelect.value = tzList.includes(defaultTz) ? defaultTz : 'UTC';
+
+  function pad(n,w=2){return String(n).padStart(w,'0');}
+  function parseLocalInput(dtStr){ if(!dtStr) return null; const [d,p]=dtStr.split('T'); const [Y,M,D]=d.split('-').map(Number); const [h,m]=p.split(':').map(Number); return {Y,M,D,h,m}; }
+
+  // Convert local time in IANA zone to UTC ms
+  function localInZoneToUtcMs(c, timeZone){
+    const {Y,M,D,h,m}=c; let guess = Date.UTC(Y,M-1,D,h,m,0,0);
+    function getZParts(utcMs){
+      const fmt=new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+      const parts=fmt.formatToParts(new Date(utcMs));
+      const map=Object.fromEntries(parts.map(p=>[p.type,p.value]));
+      return {Y:+map.year,M:+map.month,D:+map.day,h:+map.hour,m:+map.minute,s:+map.second};
+    }
+    function toMs(x){return Date.UTC(x.Y,x.M-1,x.D,x.h,x.m,x.s||0,0);}
+    for(let i=0;i<2;i++){ const zoned=getZParts(guess); const intended={Y,M,D,h,m,s:0}; const diff=toMs(intended)-toMs(zoned); if(diff===0) break; guess+=diff; }
+    return guess;
+  }
+  function formatUtcForGoogle(utcMs){ return new Date(utcMs).toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z'; }
+  function formatUtcIsoZ(utcMs){ return new Date(utcMs).toISOString().split('.')[0] + 'Z'; }
+  function minutesBetween(a,b){ return Math.max(1, Math.round((b-a)/60000)); }
+
+  // Ensure token survives URLSearchParams encoding
+  function restoreToken(url){
+    const enc = encodeURIComponent(tokenPlaceholder);
+    return url
+      .replaceAll(enc, tokenPlaceholder)
+      .replaceAll('%7B%7Bmember.registration+code%7D%7D', tokenPlaceholder)
+      .replaceAll('{{member.registration%20code}}', tokenPlaceholder)
+      .replaceAll('{{member.registration+code}}', tokenPlaceholder);
+  }
+
+  function buildLinks(){
+    const title = $('#title').value.trim();
+    const tz = $('#tz').value;
+    const startStr = $('#start').value;
+    const endStr = $('#end').value;
+    const locationRaw = $('#location').value.trim();
+    const gtwEvent = $('#gtwEvent').value.trim();
+    const descRaw = $('#desc').value.trim();
+
+    if(!title || !tz || !startStr || !endStr){
+      $('#status').textContent='Please complete required fields.'; $('#status').className='note warn'; return;
+    }
+    const startMs = localInZoneToUtcMs(parseLocalInput(startStr), tz);
+    const endMs = localInZoneToUtcMs(parseLocalInput(endStr), tz);
+    if(isNaN(startMs)||isNaN(endMs)){ $('#status').textContent='Invalid date/time.'; $('#status').className='note warn'; return; }
+    if(endMs<=startMs){ $('#status').textContent='End must be after start.'; $('#status').className='note warn'; return; }
+
+    const join = gtwEvent ? `https://global.gotowebinar.com/join/${gtwEvent}/${tokenPlaceholder}` : '';
+    const locationComputed = locationRaw || (join ? join : 'Online');
+    const details = [descRaw, (join ? `Join link: ${join}` : '')].filter(Boolean).join('\n');
+
+    // Google
+    const gParams = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title,
+      dates: `${formatUtcForGoogle(startMs)}/${formatUtcForGoogle(endMs)}`,
+      details: details,
+      location: locationComputed,
+      ctz: tz
+    });
+    let googleUrl = `https://calendar.google.com/calendar/render?${gParams.toString()}`;
+    googleUrl = restoreToken(googleUrl);
+
+    // Outlook (Microsoft 365 / Outlook on the web)
+    const outParamsBase = {
+      path: '/calendar/action/compose',
+      rru: 'addevent',
+      subject: title,
+      startdt: formatUtcIsoZ(startMs),
+      enddt: formatUtcIsoZ(endMs),
+      body: details,
+      location: locationComputed
+    };
+    let o365Url = `https://outlook.office.com/calendar/0/deeplink/compose?${new URLSearchParams(outParamsBase).toString()}`;
+    o365Url = restoreToken(o365Url);
+
+    // Outlook.com (consumer)
+    let outlookComUrl = `https://outlook.live.com/calendar/0/deeplink/compose?${new URLSearchParams(outParamsBase).toString()}`;
+    outlookComUrl = restoreToken(outlookComUrl);
+
+    // Yahoo
+    const durMin = minutesBetween(startMs,endMs);
+    const durHours = Math.floor(durMin/60);
+    const durMinutes = durMin % 60;
+    const yahooParams = new URLSearchParams({
+      v:'60', view:'d', type:'20',
+      title: title,
+      st: formatUtcForGoogle(startMs),
+      dur: `${String(Math.min(durHours,99)).padStart(2,'0')}${String(durMinutes).padStart(2,'0')}`,
+      desc: details,
+      in_loc: locationComputed
+    });
+    let yahooUrl = `https://calendar.yahoo.com/?${yahooParams.toString()}`;
+    yahooUrl = restoreToken(yahooUrl);
+
+    // ICS
+    const uid = `${(crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-uid'))}@example.com`;
+    const dtstamp = new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+    function icsEscape(s){ return s.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+    const icsLines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//YourCompany//Webinar Link Generator//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${dtstamp}`,
+      `DTSTART:${formatUtcForGoogle(startMs)}`,
+      `DTEND:${formatUtcForGoogle(endMs)}`,
+      `SUMMARY:${icsEscape(title)}`,
+      locationComputed ? `LOCATION:${icsEscape(locationComputed)}` : null,
+      join ? `URL:${icsEscape(join)}` : null,
+      details ? `DESCRIPTION:${icsEscape(details)}` : null,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].filter(Boolean);
+    const icsContent = icsLines.join('\r\n') + '\r\n';
+
+    // Fill UI
+    $('#googleLink').value = googleUrl; $('#googleOpen').href = googleUrl;
+    $('#o365Link').value = o365Url; $('#o365Open').href = o365Url;
+    $('#outlookComLink').value = outlookComUrl; $('#outlookComOpen').href = outlookComUrl;
+    $('#yahooLink').value = yahooUrl; $('#yahooOpen').href = yahooUrl;
+    $('#icsText').value = icsContent;
+
+    $('#status').textContent = 'Links generated.'; $('#status').className='note success';
+  }
+
+  $('#generate').addEventListener('click', buildLinks);
+  $$('#app input, #app select, #app textarea').forEach(el => {
+    el.addEventListener('change', () => { $('#status').textContent=''; $('#status').className='note'; });
+  });
+
+  // Copy buttons
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-copy]'); if (!btn) return;
+    const target = document.querySelector(btn.getAttribute('data-copy'));
+    if (target) {
+      try { await navigator.clipboard.writeText(target.value || target.textContent || ''); btn.textContent = 'Copied'; setTimeout(()=>btn.textContent='Copy', 1200); }
+      catch(err){ alert('Copy failed. Select and copy manually.'); }
+    }
+  });
+
+  // Download ICS
+  $('#downloadIcs').addEventListener('click', () => {
+    const text = $('#icsText').value;
+    if (!text) { alert('Generate the ICS first.'); return; }
+    const blob = new Blob([text], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'webinar.ics';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 250);
+  });
+
+  // Defaults: next top-of-hour, +1 hour
+  (function setDefaultTimes(){
+    const now=new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours()+2);
+    const end=new Date(now.getTime()+60*60000);
+    function toLocalInput(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); const h=String(d.getHours()).padStart(2,'0'); const min=String(d.getMinutes()).padStart(2,'0'); return `${y}-${m}-${day}T${h}:${min}`; }
+    $('#start').value = toLocalInput(now);
+    $('#end').value = toLocalInput(end);
+  })();
+})();
+</script>
+</body>
+</html>
